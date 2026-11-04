@@ -1,0 +1,17 @@
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,sans-serif;background:#12141c;color:#e8e9ef}
+main{max-width:960px;margin:0 auto;padding:20px}
+h1,h2,h3{margin:0 0 10px}
+.card{background:#1c1f2b;border:1px solid #2c3042;border-radius:12px;padding:16px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+input{width:100%;padding:10px;border-radius:8px;border:1px solid #34394f;background:#12141c;color:inherit;margin-bottom:8px}
+button{padding:10px 14px;border:0;border-radius:8px;background:#f58a1f;color:#111;font-weight:600;cursor:pointer;margin-right:6px}
+button.alt{background:#2c3042;color:#e8e9ef}
+button.ok{background:#3ecf6e}button.no{background:#ef5b5b}
+button:disabled{opacity:.4;cursor:not-allowed}
+.clue{padding:8px 10px;border-radius:8px;margin-bottom:6px;background:#12141c;display:flex;justify-content:space-between;gap:8px}
+.t{color:#3ecf6e;font-weight:700}.f{color:#ef5b5b;font-weight:700}.w{color:#f5c542}
+.muted{color:#8b90a8;font-size:14px}.err{color:#ef5b5b}
+.list{max-height:320px;overflow:auto}
+.code{font-size:40px;letter-spacing:8px;font-weight:800;color:#f58a1f}
