@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 const Stamp = ({ a }) =>
   a === null ? <span className="stamp w">MENUNGGU</span>
+  : a === 'skip' ? <span className="stamp w">TAK DIJAWAB</span>
   : a ? <span className="stamp t">BENAR</span> : <span className="stamp f">SALAH</span>;
 
 const Thread = ({ items, side }) => (
@@ -24,6 +25,12 @@ export default function Page() {
   const [guess, setGuess] = useState('');
   const [ch, setCh] = useState('');
   const [al, setAl] = useState('');
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     const s = localStorage.getItem('sess');
@@ -36,7 +43,7 @@ export default function Page() {
     if (!sess) return;
     const tick = async () => {
       const r = await fetch(`/api/room?code=${sess.code}&pid=${sess.pid}`, { cache: 'no-store' });
-      if (r.ok) setSt(await r.json());
+      if (r.ok) setSt({ ...(await r.json()), _at: Date.now() });
       else if (r.status === 404 || r.status === 403) leave();
     };
     tick();
@@ -49,7 +56,7 @@ export default function Page() {
     const r = await fetch('/api/room', { method: 'POST', body: JSON.stringify(body) });
     const d = await r.json();
     if (!r.ok) { setErr(d.error); return null; }
-    if (d.state) setSt(d.state);
+    if (d.state) setSt({ ...d.state, _at: Date.now() });
     return d;
   };
   const enter = async (action) => {
@@ -85,6 +92,8 @@ export default function Page() {
   const theirs = clues.filter((c) => c.from !== myId);
   const toAnswer = pendingClue && pendingClue.from !== myId ? pendingClue : null;
   const locked = !myTurn || !!pendingClue;
+  const left = st.timeLeft == null ? null : Math.max(0, Math.ceil(st.timeLeft - (now - st._at) / 1000));
+  const fmt = (n) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
 
   const Player = ({ n, on, turnNow, self }) => (
     <div className={`pl ${turnNow ? 'turn' : ''}`}>
@@ -93,6 +102,36 @@ export default function Page() {
         <small>{on === undefined ? '' : <><i className={`dot ${on ? 'on' : ''}`} />{on ? 'online' : 'offline'}</>}</small>
       </div>
     </div>
+  );
+
+  // Dipanggil sebagai fungsi (bukan <Komponen/>) supaya input tidak remount tiap polling
+  const TimerSetting = () => (
+    <div className="timer-set">
+      <span className="mut">Timer giliran</span>
+      {st.isHost ? (
+        <select value={st.settings.turnSeconds} onChange={(e) => act('set_timer', { seconds: Number(e.target.value) })}>
+          {[0, 30, 60, 90, 120, 180, 300].map((s) => (
+            <option key={s} value={s}>{s ? `${s} detik` : 'Tanpa timer'}</option>
+          ))}
+        </select>
+      ) : <b>{st.settings.turnSeconds ? `${st.settings.turnSeconds} detik` : 'Tanpa timer'}</b>}
+      {!st.isHost && <span className="mut">(diatur room master)</span>}
+    </div>
+  );
+  const Guesses = () => (
+    <>
+      <h3>Riwayat tebakan</h3>
+      {st.guesses.length === 0 ? <p className="mut">Belum ada tebakan.</p> : (
+        <div className="gl">
+          {st.guesses.map((g) => (
+            <div key={g.id} className="g">
+              <span><b>{g.by === myId ? 'Kamu' : op.name}</b>: {g.text}</span>
+              <span className={`stamp ${g.correct ? 't' : 'f'}`}>{g.correct ? 'BENAR' : 'SALAH'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 
   return (
@@ -116,12 +155,14 @@ export default function Page() {
           <h2>Ajak temanmu masuk</h2>
           <p className="mut">Bagikan kode ini. Game dimulai setelah pemain kedua bergabung.</p>
           <div className="code">{st.code.split('').map((c, i) => <span key={i}>{c}</span>)}</div>
+          {TimerSetting()}
         </div>
       )}
 
       {phase === 'setup' && (
         <div className="card">
           <h2>Pilih karakter rahasiamu</h2>
+          {TimerSetting()}
           {me.ready ? (
             <p>Karakter <b>{me.character}</b> tersimpan. Menunggu {op?.name} siap…</p>
           ) : (
@@ -137,6 +178,12 @@ export default function Page() {
 
       {phase === 'play' && (
         <>
+          {st.notice && <p className="notice">{st.notice}</p>}
+          {left !== null && (
+            <div className={`timer ${left <= 10 ? 'low' : ''}`}>
+              <span>{st.actor === myId ? 'Waktumu' : `Waktu ${op.name}`}</span><b>{fmt(left)}</b>
+            </div>
+          )}
           {toAnswer && (
             <div className="card hot">
               <p className="mut">{op.name} bertanya tentang karakter kamu ({me.character}):</p>
@@ -153,7 +200,6 @@ export default function Page() {
               <h3>Karakter {op.name}</h3>
               <p className="mut">
                 {myTurn ? (pendingClue ? 'Menunggu jawaban lawan…' : 'Giliranmu. Kirim satu clue (giliran pindah setelah dijawab), atau langsung tebak.') : `Menunggu giliran ${op.name}.`}
-                {st.lastGuess && ` Tebakan terakhir ("${st.lastGuess.text}") salah.`}
               </p>
               <Thread items={mine} side="me" />
               <div className="row">
@@ -182,6 +228,7 @@ export default function Page() {
               <Thread items={theirs} side="op" />
             </div>
           </div>
+          <div className="card">{Guesses()}</div>
         </>
       )}
 
@@ -193,6 +240,7 @@ export default function Page() {
             <div><p className="mut">Karakter {op.name}</p><div className="secret">{op.character}</div><Thread items={mine} side="me" /></div>
             <div><p className="mut">Karakter kamu</p><div className="secret">{me.character}</div><Thread items={theirs} side="op" /></div>
           </div>
+          <div style={{ marginBottom: 14 }}>{Guesses()}</div>
           <button className="go" onClick={() => act('rematch')}>Main lagi</button>
         </div>
       )}
