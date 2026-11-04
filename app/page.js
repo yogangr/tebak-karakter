@@ -152,7 +152,7 @@ export default function Page() {
             <div className="card">
               <h3>Karakter {op.name}</h3>
               <p className="mut">
-                {myTurn ? (pendingClue ? 'Menunggu jawaban lawan…' : 'Giliranmu. Kirim clue, tebak, atau akhiri giliran.') : `Menunggu giliran ${op.name}.`}
+                {myTurn ? (pendingClue ? 'Menunggu jawaban lawan…' : 'Giliranmu. Kirim satu clue (giliran pindah setelah dijawab), atau langsung tebak.') : `Menunggu giliran ${op.name}.`}
                 {st.lastGuess && ` Tebakan terakhir ("${st.lastGuess.text}") salah.`}
               </p>
               <Thread items={mine} side="me" />
@@ -170,7 +170,7 @@ export default function Page() {
                   onClick={async () => { if (await act('guess', { text: guess })) setGuess(''); }}>Tebak</button>
               </div>
               <div className="row">
-                <button className="ghost" disabled={locked} onClick={() => act('end_turn')}>Akhiri giliran</button>
+                <button className="ghost" disabled={locked} onClick={() => act('end_turn')}>Lewati giliran</button>
                 <button className="ghost" onClick={() => confirm('Yakin menyerah?') && act('surrender')}>Menyerah</button>
               </div>
             </div>

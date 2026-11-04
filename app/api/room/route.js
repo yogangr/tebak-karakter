@@ -50,6 +50,7 @@ const actions = {
     if (s.phase !== 'play' || !c || c.from === p.id) fail('Tidak ada clue untuk dijawab');
     if (typeof b.answer !== 'boolean') fail('Jawaban tidak valid');
     c.answer = b.answer;
+    s.turn = p.id; // setelah menjawab, giliran bertanya pindah ke pemain yang menjawab
   },
   guess(s, p, b) {
     if (s.phase !== 'play' || s.turn !== p.id) fail('Bukan giliranmu');
