@@ -1,6 +1,19 @@
 'use client';
 import { useEffect, useState } from 'react';
 
+const Stamp = ({ a }) =>
+  a === null ? <span className="stamp w">MENUNGGU</span>
+  : a ? <span className="stamp t">BENAR</span> : <span className="stamp f">SALAH</span>;
+
+const Thread = ({ items, side }) => (
+  <div className="thread">
+    {items.length === 0 && <div className="empty">Belum ada clue.</div>}
+    {items.map((c) => (
+      <div key={c.id} className={`msg ${side}`}><span>{c.text}</span><Stamp a={c.answer} /></div>
+    ))}
+  </div>
+);
+
 export default function Page() {
   const [sess, setSess] = useState(null);
   const [st, setSt] = useState(null);
@@ -43,22 +56,22 @@ export default function Page() {
     const d = await call({ action, name, code });
     if (d) { const s = { code: d.code, pid: d.pid }; localStorage.setItem('sess', JSON.stringify(s)); setSess(s); }
   };
-  const act = async (action, extra = {}) => {
-    const d = await call({ action, ...sess, ...extra });
-    return d;
-  };
+  const act = (action, extra = {}) => call({ action, ...sess, ...extra });
 
   if (!sess || !st) {
     return (
       <main>
-        <h1>🍥 Tebak Karakter</h1>
-        <div className="card" style={{ maxWidth: 420 }}>
-          <input placeholder="Nickname" value={name} onChange={(e) => setName(e.target.value)} />
-          <button onClick={() => enter('create')}>Buat Room</button>
-          <hr style={{ borderColor: '#2c3042', margin: '14px 0' }} />
-          <input placeholder="Kode room" value={code} maxLength={4}
+        <div className="hero">
+          <h1>Siapa Aku?</h1>
+          <p>Duel tebak karakter berdua. Tulis karakter rahasiamu, lalu bongkar karakter lawan lewat clue yang kamu tulis sendiri.</p>
+        </div>
+        <div className="card stack">
+          <input placeholder="Nickname kamu" value={name} onChange={(e) => setName(e.target.value)} />
+          <button className="go" onClick={() => enter('create')}>Buat room baru</button>
+          <div className="sep">atau gabung</div>
+          <input placeholder="Kode room (4 huruf)" value={code} maxLength={4}
             onChange={(e) => setCode(e.target.value.toUpperCase())} />
-          <button className="alt" onClick={() => enter('join')}>Gabung</button>
+          <button onClick={() => enter('join')}>Gabung room</button>
           {err && <p className="err">{err}</p>}
         </div>
       </main>
@@ -71,88 +84,102 @@ export default function Page() {
   const mine = clues.filter((c) => c.from === myId);
   const theirs = clues.filter((c) => c.from !== myId);
   const toAnswer = pendingClue && pendingClue.from !== myId ? pendingClue : null;
-  const label = (c) => (c.answer === null ? <span className="w">menunggu…</span>
-    : c.answer ? <span className="t">BENAR</span> : <span className="f">SALAH</span>);
+  const locked = !myTurn || !!pendingClue;
 
-  const ClueList = ({ items }) => (
-    <div className="list">
-      {items.length === 0 && <p className="muted">Belum ada clue.</p>}
-      {items.map((c) => (<div className="clue" key={c.id}><span>{c.text}</span>{label(c)}</div>))}
+  const Player = ({ n, on, turnNow, self }) => (
+    <div className={`pl ${turnNow ? 'turn' : ''}`}>
+      <div className="av">{(n || '?')[0].toUpperCase()}</div>
+      <div>{self ? `${n} (kamu)` : n}
+        <small>{on === undefined ? '' : <><i className={`dot ${on ? 'on' : ''}`} />{on ? 'online' : 'offline'}</>}</small>
+      </div>
     </div>
   );
 
   return (
     <main>
-      <h1>🍥 Tebak Karakter</h1>
-      <p className="muted">
-        Kamu: <b>{me.name}</b> · Lawan: <b>{op?.name || '—'}</b>
-        {op && <> ({op.online ? '🟢 online' : '🔴 offline'})</>} · Room {st.code}
-        {' '}<button className="alt" onClick={leave}>Keluar</button>
-      </p>
+      <div className="top">
+        <div className="duel">
+          <Player n={me.name} self turnNow={phase === 'play' && myTurn} />
+          <span className="vs">VS</span>
+          {op ? <Player n={op.name} on={op.online} turnNow={phase === 'play' && !myTurn} />
+              : <span className="mut">Menunggu lawan…</span>}
+        </div>
+        <div className="row" style={{ margin: 0 }}>
+          <span className="chip">{st.code}</span>
+          <button className="ghost" onClick={leave}>Keluar</button>
+        </div>
+      </div>
       {err && <p className="err">{err}</p>}
 
       {phase === 'lobby' && (
         <div className="card">
-          <p>Bagikan kode ini ke temanmu:</p>
-          <div className="code">{st.code}</div>
-          <p className="muted">Menunggu pemain kedua bergabung…</p>
+          <h2>Ajak temanmu masuk</h2>
+          <p className="mut">Bagikan kode ini. Game dimulai setelah pemain kedua bergabung.</p>
+          <div className="code">{st.code.split('').map((c, i) => <span key={i}>{c}</span>)}</div>
         </div>
       )}
 
       {phase === 'setup' && (
         <div className="card">
-          <h2>Tulis karakter rahasiamu</h2>
+          <h2>Pilih karakter rahasiamu</h2>
           {me.ready ? (
-            <p>✅ Karakter tersimpan. Menunggu {op?.name} siap…</p>
+            <p>Karakter <b>{me.character}</b> tersimpan. Menunggu {op?.name} siap…</p>
           ) : (
-            <>
+            <div className="stack" style={{ maxWidth: 480 }}>
+              <p className="mut">Lawan tidak bisa melihat ini sampai game selesai.</p>
               <input placeholder="Nama karakter, mis. Itachi Uchiha" value={ch} onChange={(e) => setCh(e.target.value)} />
-              <input placeholder="Alias (pisahkan koma), mis. Itachi, Uchiha Itachi" value={al} onChange={(e) => setAl(e.target.value)} />
-              <button onClick={() => act('set_character', { character: ch, aliases: al })}>Siap</button>
-            </>
+              <input placeholder="Nama lain, pisahkan koma: Itachi, Uchiha Itachi" value={al} onChange={(e) => setAl(e.target.value)} />
+              <button className="go" disabled={!ch.trim()} onClick={() => act('set_character', { character: ch, aliases: al })}>Kunci karakter</button>
+            </div>
           )}
         </div>
       )}
 
       {phase === 'play' && (
         <>
-          <div className="card">
-            <b>{myTurn ? '🎯 Giliranmu' : `⏳ Giliran ${op.name}`}</b>
-            {st.lastGuess && <p className="muted">Tebakan terakhir salah: "{st.lastGuess.text}"</p>}
-            <button className="no" style={{ float: 'right' }}
-              onClick={() => confirm('Yakin menyerah?') && act('surrender')}>Menyerah</button>
-          </div>
-
           {toAnswer && (
-            <div className="card" style={{ borderColor: '#f58a1f' }}>
-              <h3>{op.name} bertanya:</h3>
-              <p style={{ fontSize: 18 }}>{toAnswer.text}</p>
-              <p className="muted">Karakter kamu: <b>{me.character}</b></p>
-              <button className="ok" onClick={() => act('validate', { answer: true })}>Benar</button>
-              <button className="no" onClick={() => act('validate', { answer: false })}>Salah</button>
+            <div className="card hot">
+              <p className="mut">{op.name} bertanya tentang karakter kamu ({me.character}):</p>
+              <div className="q">{toAnswer.text}</div>
+              <div className="row">
+                <button className="ok big" onClick={() => act('validate', { answer: true })}>Benar</button>
+                <button className="no big" onClick={() => act('validate', { answer: false })}>Salah</button>
+              </div>
             </div>
           )}
 
           <div className="grid">
             <div className="card">
-              <h3>Karakter Lawan</h3>
-              <ClueList items={mine} />
-              <input placeholder="Tulis clue / pertanyaan…" value={clue}
-                disabled={!myTurn || !!pendingClue} onChange={(e) => setClue(e.target.value)} />
-              <button disabled={!myTurn || !!pendingClue || !clue.trim()}
-                onClick={async () => { if (await act('send_clue', { text: clue })) setClue(''); }}>Kirim Clue</button>
-              <hr style={{ borderColor: '#2c3042', margin: '14px 0' }} />
-              <input placeholder="Tebak nama karakter…" value={guess}
-                disabled={!myTurn || !!pendingClue} onChange={(e) => setGuess(e.target.value)} />
-              <button disabled={!myTurn || !!pendingClue || !guess.trim()}
-                onClick={async () => { if (await act('guess', { text: guess })) setGuess(''); }}>Submit Tebakan</button>
-              <button className="alt" disabled={!myTurn || !!pendingClue}
-                onClick={() => act('end_turn')}>Akhiri Giliran</button>
+              <h3>Karakter {op.name}</h3>
+              <p className="mut">
+                {myTurn ? (pendingClue ? 'Menunggu jawaban lawan…' : 'Giliranmu. Kirim clue, tebak, atau akhiri giliran.') : `Menunggu giliran ${op.name}.`}
+                {st.lastGuess && ` Tebakan terakhir ("${st.lastGuess.text}") salah.`}
+              </p>
+              <Thread items={mine} side="me" />
+              <div className="row">
+                <input placeholder="Tulis clue atau pertanyaan" value={clue} disabled={locked}
+                  onChange={(e) => setClue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && clue.trim() && act('send_clue', { text: clue }).then((d) => d && setClue(''))} />
+                <button disabled={locked || !clue.trim()}
+                  onClick={async () => { if (await act('send_clue', { text: clue })) setClue(''); }}>Kirim</button>
+              </div>
+              <div className="row">
+                <input placeholder="Tebak nama karakternya" value={guess} disabled={locked}
+                  onChange={(e) => setGuess(e.target.value)} />
+                <button className="go" disabled={locked || !guess.trim()}
+                  onClick={async () => { if (await act('guess', { text: guess })) setGuess(''); }}>Tebak</button>
+              </div>
+              <div className="row">
+                <button className="ghost" disabled={locked} onClick={() => act('end_turn')}>Akhiri giliran</button>
+                <button className="ghost" onClick={() => confirm('Yakin menyerah?') && act('surrender')}>Menyerah</button>
+              </div>
             </div>
+
             <div className="card">
-              <h3>Karakterku: {me.character}</h3>
-              <p className="muted">Pertanyaan dari {op.name}</p>
-              <ClueList items={theirs} />
+              <h3>Karakter kamu</h3>
+              <div className="secret">{me.character}</div>
+              <h3>Pertanyaan dari {op.name}</h3>
+              <Thread items={theirs} side="op" />
             </div>
           </div>
         </>
@@ -160,14 +187,13 @@ export default function Page() {
 
       {phase === 'done' && (
         <div className="card">
-          <h2>{st.winner === myId ? '🏆 Kamu menang!' : '😵 Kamu kalah'}</h2>
-          <p>{st.reason}</p>
-          <p>Karakter {op.name}: <b>{op.character}</b> · Karakter kamu: <b>{me.character}</b></p>
-          <div className="grid">
-            <div><h3>Clue kamu</h3><ClueList items={mine} /></div>
-            <div><h3>Clue {op.name}</h3><ClueList items={theirs} /></div>
+          <h2>{st.winner === myId ? 'Kamu menang!' : 'Kamu kalah'}</h2>
+          <p className="mut">{st.reason}</p>
+          <div className="result">
+            <div><p className="mut">Karakter {op.name}</p><div className="secret">{op.character}</div><Thread items={mine} side="me" /></div>
+            <div><p className="mut">Karakter kamu</p><div className="secret">{me.character}</div><Thread items={theirs} side="op" /></div>
           </div>
-          <button onClick={() => act('rematch')}>Main Lagi</button>
+          <button className="go" onClick={() => act('rematch')}>Main lagi</button>
         </div>
       )}
     </main>
